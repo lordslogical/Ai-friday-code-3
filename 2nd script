@@ -1,0 +1,55 @@
+from flask import Flask, request, render_template_string
+import pandas as pd
+import google.generativeai as genai
+
+app = Flask(__name__)
+
+Configure Gemini API
+genai.configure(api_key='your-gemini-api-key')
+
+HTML template for the web interface
+template = '''
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>Product Description Generator</h1>
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="file">
+    <select name="tone">
+      <option value="luxury">Luxury</option>
+      <option value="casual">Casual</option>
+      <option value="professional">Professional</option>
+    </select>
+    <button type="submit">Generate Descriptions</button>
+  </form>
+  {% if descriptions %}
+    <h2>Generated Descriptions:</h2>
+    <pre>{{ descriptions }}</pre>
+  {% endif %}
+</body>
+</html>
+'''
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        file = request.files['file']
+        tone = request.form['tone']
+        df = pd.read_csv(file)
+        descriptions = []
+        model = genai.GenerativeModel('gemini-turbo')
+        for _, row in df.iterrows():
+            prompt = f"You are an e-commerce copywriter. Create an engaging product description for the item below. Use a {tone} tone. Highlight the key features and benefits.\n\nProduct: {row['name']}\nCategory: {row['category']}\nFeatures: {row['features']}\nSpecifications: {row['specs']}\n\nOutput format:\n[Short catchy headline]\n[Paragraph description emphasizing unique selling points and usability]."
+            response = model.generate_content(prompt)
+            description = response.text
+            descriptions.append(description)
+        return render_template_string(template, descriptions='\n\n'.join(descriptions))
+    return render_template_string(template)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+1. Replace `'your-gemini-api-key'` with your actual Gemini API key.
+2. Make sure you have the `google-generativeai` package installed.
+3. Run the app: `python app.py`.
+4. Open `http://127.0.0.1:5000/` in your browser.
