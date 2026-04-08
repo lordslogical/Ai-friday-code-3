@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeForge — Legacy Code Modernizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #09090f;
+  --surface: #0f0f1a;
+  --surface2: #14141f;
+  --border: #1e1e2e;
+  --border2: #2a2a3e;
+  --accent: #7c3aed;
+  --accent2: #06b6d4;
+  --accent3: #10b981;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --text: #e8e8f0;
+  --muted: #6b6b8a;
+  --muted2: #4a4a6a;
+  --glow: rgba(124,58,237,0.15);
+  --glow2: rgba(6,182,212,0.1);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;overflow:hidden;}
+
+/* ── GRID NOISE BACKGROUND ── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(124,58,237,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(124,58,237,0.03) 1px,transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;z-index:0;
+}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:relative;z-index:10;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:58px;
+  background:rgba(9,9,15,0.95);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);
+  flex-shrink:0;
+}
+.brand{
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
+  letter-spacing:-0.03em;color:var(--text);
+  display:flex;align-items:center;gap:10px;
+}
+.brand-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.brand-tag{
+  font-family:'Space Mono',monospace;font-size:9px;
+  color:var(--muted);letter-spacing:0.15em;margin-top:2px;
+}
+.topbar-pills{display:flex;gap:8px;}
+.pill{
+  font-family:'Space Mono',monospace;font-size:9px;
+  padding:4px 10px;border-radius:20px;letter-spacing:0.08em;
+  border:1px solid var(--border2);color:var(--muted);
+  display:flex;align-items:center;gap:5px;
+}
+.pill.active{border-color:var(--accent);color:var(--accent);background:rgba(124,58,237,0.08);}
+.pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── MAIN LAYOUT ── */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden;position:relative;z-index:1;}
+.workspace{display:grid;grid-template-columns:420px 1fr;flex:1;overflow:hidden;min-height:0;}
+
+/* ── LEFT PANEL ── */
+.left-panel{
+  display:flex;flex-direction:column;
+  border-right:1px solid var(--border);
+  background:var(--surface);overflow:hidden;
+}
+.panel-header{
+  padding:18px 20px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface2);flex-shrink:0;
+}
+.ph-label{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:0.18em;text-transform:uppercase;color:var(--accent2);
+  margin-bottom:5px;
+}
+.ph-title{
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);
+}
+.panel-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:16px;}
+
+/* ── API KEY ── */
+.api-row{display:flex;gap:8px;align-items:center;}
+.api-input{
+  flex:1;background:var(--bg);border:1px solid var(--border2);
+  border-radius:6px;color:var(--text);font-family:'Space Mono',monospace;
+  font-size:11px;padding:9px 12px;outline:none;
+  transition:border-color .2s;
+}
+.api-input:focus{border-color:var(--accent);}
+.api-input::placeholder{color:var(--muted2);}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{
+  border:1.5px dashed var(--border2);border-radius:8px;
+  padding:20px;text-align:center;cursor:pointer;
+  transition:all .2s;background:var(--bg);position:relative;
+  min-height:100px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;
+}
+.upload-zone:hover,.upload-zone.drag{
+  border-color:var(--accent);background:rgba(124,58,237,0.05);
+}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.uz-icon{font-size:26px;}
+.uz-text{font-size:12px;color:var(--muted);line-height:1.6;}
+.uz-text strong{color:var(--accent2);font-weight:600;}
+.file-badge{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);
+  border-radius:6px;padding:8px 12px;font-size:11px;
+  font-family:'Space Mono',monospace;color:var(--accent2);
+}
+.file-badge .rm{margin-left:auto;cursor:pointer;color:var(--muted);font-size:14px;}
+.file-badge .rm:hover{color:var(--danger);}
+
+/* ── OR ── */
+.or-divider{
+  display:flex;align-items:center;gap:10px;
+  font-family:'Space Mono',monospace;font-size:9px;color:var(--muted2);
+  letter-spacing:0.1em;
+}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── TEXTAREA ── */
+.field-label{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+}
+textarea,select,input[type=text],input[type=password]{
+  width:100%;background:var(--bg);border:1px solid var(--border2);
+  border-radius:6px;color:var(--text);font-family:'Space Mono',monospace;
+  font-size:11px;padding:10px 12px;outline:none;
+  transition:border-color .2s;line-height:1.7;
+  resize:none;
+}
+textarea:focus,select:focus,input:focus{border-color:var(--accent);}
+textarea::placeholder,select::placeholder{color:var(--muted2);}
+select option{background:var(--surface2);}
+
+/* ── CTA ── */
+.btn-run{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,var(--accent),#5b21b6);
+  border:none;border-radius:8px;
+  color:#fff;font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:700;letter-spacing:-0.01em;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 0 30px rgba(124,58,237,0.3);
+  position:relative;overflow:hidden;
+}
+.btn-run::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+  opacity:0;transition:opacity .2s;
+}
+.btn-run:hover:not(:disabled)::before{opacity:1;}
+.btn-run:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 40px rgba(124,58,237,0.5);}
+.btn-run:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+/* ── RIGHT PANEL: TABS ── */
+.right-panel{display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+.tab-bar{
+  display:flex;align-items:center;gap:0;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;
+  padding:0 20px;
+}
+.tab{
+  font-family:'Space Mono',monospace;font-size:10px;
+  letter-spacing:0.08em;padding:14px 18px;
+  color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .2s;
+  display:flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+.tab .tab-badge{
+  width:16px;height:16px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  font-size:8px;display:flex;align-items:center;justify-content:center;
+  display:none;
+}
+.tab .tab-badge.show{display:flex;}
+
+/* ── AGENT LOG ── */
+.agent-bar{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 20px;
+  background:var(--surface2);border-bottom:1px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:10px;
+  flex-shrink:0;min-height:36px;
+}
+.agent-step{color:var(--accent2);}
+.agent-msg{color:var(--muted);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.agent-spinner{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid var(--border2);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.agent-check{color:var(--accent3);font-size:12px;flex-shrink:0;}
+
+/* ── TAB CONTENT ── */
+.tab-content{flex:1;overflow:hidden;display:none;}
+.tab-content.active{display:flex;flex-direction:column;}
+.content-scroll{flex:1;overflow-y:auto;padding:24px;}
+
+/* ── EMPTY STATE ── */
+.empty-state{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+  text-align:center;padding:60px 40px;
+}
+.empty-glyph{
+  font-size:56px;opacity:0.15;
+  font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);
+}
+.empty-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--muted);margin-bottom:4px;}
+.empty-desc{font-size:13px;color:var(--muted2);max-width:300px;line-height:1.7;}
+
+/* ── COMPATIBILITY CARD ── */
+.compat-hero{
+  background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(6,182,212,0.08));
+  border:1px solid var(--border2);border-radius:10px;
+  padding:22px;margin-bottom:18px;
+  animation:fadeUp .4s ease both;
+}
+.compat-decision{
+  font-family:'Syne',sans-serif;font-size:20px;font-weight:800;
+  color:var(--text);margin-bottom:8px;line-height:1.3;
+}
+.compat-version{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);
+  border-radius:20px;padding:4px 14px;
+  font-family:'Space Mono',monospace;font-size:11px;color:var(--accent2);
+  margin-bottom:14px;
+}
+.compat-reasoning{font-size:13px;color:var(--muted);line-height:1.7;}
+.compat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:16px;}
+.compat-stat{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:12px;text-align:center;
+}
+.cs-val{
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
+  color:var(--accent3);margin-bottom:2px;
+}
+.cs-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.1em;}
+
+/* ── ALTERNATIVES ── */
+.alt-list{display:flex;flex-direction:column;gap:8px;}
+.alt-item{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:12px 14px;
+  display:flex;align-items:center;gap:12px;
+  animation:fadeUp .3s ease both;
+}
+.alt-rank{
+  font-family:'Space Mono',monospace;font-size:10px;
+  color:var(--muted2);width:20px;text-align:center;flex-shrink:0;
+}
+.alt-name{font-size:13px;font-weight:600;color:var(--text);}
+.alt-why{font-size:11px;color:var(--muted);margin-top:2px;}
+.alt-score{
+  margin-left:auto;font-family:'Space Mono',monospace;font-size:11px;
+  font-weight:700;flex-shrink:0;
+}
+.score-high{color:var(--accent3);}
+.score-med{color:var(--warn);}
+
+/* ── SECTION HEADERS ── */
+.section-hd{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:0.18em;text-transform:uppercase;color:var(--muted2);
+  display:flex;align-items:center;gap:12px;margin:20px 0 10px;
+}
+.section-hd::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── DOCS PANEL ── */
+.doc-block{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:18px 20px;margin-bottom:14px;
+  animation:fadeUp .35s ease both;
+}
+.doc-type{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:0.15em;color:var(--accent2);text-transform:uppercase;margin-bottom:6px;
+}
+.doc-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:10px;}
+.doc-body{font-size:13px;color:var(--muted);line-height:1.8;}
+.doc-body pre{
+  background:var(--bg);border:1px solid var(--border);border-radius:4px;
+  padding:10px 12px;margin:10px 0;font-family:'Space Mono',monospace;
+  font-size:10px;color:var(--accent2);overflow-x:auto;line-height:1.6;
+  white-space:pre-wrap;word-break:break-all;
+}
+
+/* ── CODE PANELS ── */
+.code-wrap{
+  flex:1;overflow:hidden;display:flex;flex-direction:column;
+}
+.code-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 20px;background:var(--surface2);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.code-lang{
+  font-family:'Space Mono',monospace;font-size:10px;color:var(--accent2);
+  letter-spacing:0.08em;
+}
+.btn-copy{
+  font-family:'Space Mono',monospace;font-size:9px;
+  padding:5px 12px;border-radius:4px;
+  background:var(--surface);border:1px solid var(--border2);
+  color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:0.05em;
+}
+.btn-copy:hover{border-color:var(--accent2);color:var(--accent2);}
+.code-scroll{flex:1;overflow:auto;}
+.code-block{
+  padding:20px;font-family:'Space Mono',monospace;
+  font-size:11px;line-height:1.8;color:#a8b3cf;
+  white-space:pre-wrap;word-break:break-all;min-height:100%;
+}
+/* syntax-ish coloring */
+.code-block .c-comment{color:#5c6370;font-style:italic;}
+.code-block .c-kw{color:#c678dd;}
+.code-block .c-fn{color:#61afef;}
+.code-block .c-str{color:#98c379;}
+.code-block .c-num{color:#d19a66;}
+
+/* ── PROGRESS BAR ── */
+.prog-wrap{height:2px;background:var(--surface2);flex-shrink:0;}
+.prog-bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s;}
+.prog-bar.run{animation:prog 1.5s ease-in-out infinite alternate;}
+@keyframes prog{0%{width:20%;margin-left:0}100%{width:40%;margin-left:60%}}
+
+/* ── DIFF VIEW ── */
+.diff-wrap{flex:1;overflow:auto;padding:0;}
+.diff-line{
+  display:flex;align-items:flex-start;gap:0;
+  font-family:'Space Mono',monospace;font-size:10px;line-height:1.7;
+}
+.diff-line.add{background:rgba(16,185,129,0.06);}
+.diff-line.rem{background:rgba(239,68,68,0.06);}
+.diff-gutter{
+  width:36px;flex-shrink:0;padding:0 8px;
+  font-size:9px;color:var(--muted2);text-align:right;
+  user-select:none;border-right:1px solid var(--border);
+}
+.diff-sign{
+  width:20px;flex-shrink:0;text-align:center;
+  color:var(--muted2);padding:0 4px;
+}
+.diff-line.add .diff-sign{color:var(--accent3);}
+.diff-line.rem .diff-sign{color:var(--danger);}
+.diff-code{flex:1;padding:0 12px;color:#a8b3cf;white-space:pre-wrap;word-break:break-all;}
+.diff-line.add .diff-code{color:#a8e6cf;}
+.diff-line.rem .diff-code{color:#f8a0a0;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+/* ── HINT TAGS ── */
+.hint-row{display:flex;flex-wrap:wrap;gap:5px;}
+.hint{
+  font-size:10px;padding:3px 9px;border-radius:12px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--muted);transition:all .15s;font-family:'Space Mono',monospace;
+}
+.hint:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* ── SAMPLE BTNS ── */
+.sample-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.sample-btn{
+  padding:7px 10px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:5px;cursor:pointer;font-size:11px;color:var(--muted);
+  transition:all .15s;text-align:left;display:flex;flex-direction:column;gap:2px;
+}
+.sample-btn:hover{border-color:var(--accent);color:var(--text);}
+.sb-tag{font-family:'Space Mono',monospace;font-size:8px;color:var(--accent);letter-spacing:0.1em;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">⚙</div>
+    <div>
+      CodeForge
+      <div class="brand-tag">Legacy → Modern Transformer</div>
+    </div>
+  </div>
+  <div class="topbar-pills">
+    <div class="pill active" id="pill-agent"><div class="pill-dot"></div>Agentic AI</div>
+    <div class="pill" id="pill-model">DeepSeek-V3-0324</div>
+  </div>
+</div>
+
+<div class="workspace">
+
+  <!-- ── LEFT: INPUT ── -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <div class="ph-label">Configuration</div>
+      <div class="ph-title">Paste Legacy Code</div>
+    </div>
+    <div class="panel-body">
+
+      <!-- API KEY -->
+      <div>
+        <div class="field-label">TCS GenAI Lab API Key</div>
+        <div class="api-row">
+          <input type="password" class="api-input" id="api-key" placeholder="sk-...your-key-here">
+        </div>
+      </div>
+
+      <!-- FILE UPLOAD -->
+      <div>
+        <div class="field-label">Upload Code File</div>
+        <div class="upload-zone" id="upload-zone"
+          ondragover="ev.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <input type="file" id="file-input" accept=".py,.js,.ts,.java,.php,.c,.cpp,.cs,.rb,.go,.rs,.vb,.pl,.swift,.kt" onchange="handleFile(event)">
+          <div class="uz-icon">📁</div>
+          <div class="uz-text"><strong>Drop code file</strong> or click to browse<br>.py .js .java .php .c .cs .rb …</div>
+        </div>
+        <div id="file-badge-wrap"></div>
+      </div>
+
+      <div class="or-divider">or paste manually</div>
+
+      <!-- CODE TEXTAREA -->
+      <div>
+        <div class="field-label">Legacy Source Code</div>
+        <textarea id="code-input" rows="8" placeholder="Paste your legacy code here...&#10;&#10;e.g. Python 2.x, PHP 5, ES5 JS, Java 7, etc."></textarea>
+      </div>
+
+      <!-- SAMPLES -->
+      <div>
+        <div class="field-label">Load Sample</div>
+        <div class="sample-grid">
+          <button class="sample-btn" onclick="loadSample('py2')"><div class="sb-tag">PYTHON 2.7</div>Legacy Script</button>
+          <button class="sample-btn" onclick="loadSample('php5')"><div class="sb-tag">PHP 5.x</div>MySQL App</button>
+          <button class="sample-btn" onclick="loadSample('es5')"><div class="sb-tag">ES5 JS</div>Callback Hell</button>
+          <button class="sample-btn" onclick="loadSample('java7')"><div class="sb-tag">JAVA 7</div>Old Patterns</button>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <button class="btn-run" id="run-btn" onclick="runModernizer()">
+        <span>⚡</span> Analyze & Modernize
+      </button>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: OUTPUT ── -->
+  <div class="right-panel">
+
+    <!-- AGENT STATUS BAR -->
+    <div class="agent-bar" id="agent-bar">
+      <div class="agent-step" id="agent-step">—</div>
+      <div class="agent-msg" id="agent-msg">Waiting for code input…</div>
+      <div id="agent-indicator"></div>
+    </div>
+    <div class="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+
+    <!-- TABS -->
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('compat')" id="tab-compat">🧠 Compatibility <span class="tab-badge" id="badge-compat"></span></div>
+      <div class="tab" onclick="switchTab('docs')" id="tab-docs">📄 Documentation <span class="tab-badge" id="badge-docs"></span></div>
+      <div class="tab" onclick="switchTab('annotated')" id="tab-annotated">💬 Annotated Code <span class="tab-badge" id="badge-annotated"></span></div>
+      <div class="tab" onclick="switchTab('modern')" id="tab-modern">🚀 Modernized Code <span class="tab-badge" id="badge-modern"></span></div>
+      <div class="tab" onclick="switchTab('diff')" id="tab-diff">🔀 Diff View <span class="tab-badge" id="badge-diff"></span></div>
+    </div>
+
+    <!-- TAB: COMPAT -->
+    <div class="tab-content active" id="content-compat">
+      <div class="content-scroll" id="compat-scroll">
+        <div class="empty-state" id="compat-empty">
+          <div class="empty-glyph">🧠</div>
+          <div class="empty-title">No Analysis Yet</div>
+          <div class="empty-desc">Paste legacy code and click Analyze & Modernize. The AI agent will detect your platform, assess compatibility, and choose the best modern target.</div>
+        </div>
+        <div id="compat-result" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- TAB: DOCS -->
+    <div class="tab-content" id="content-docs">
+      <div class="content-scroll" id="docs-scroll">
+        <div class="empty-state" id="docs-empty">
+          <div class="empty-glyph">📄</div>
+          <div class="empty-title">No Documentation</div>
+          <div class="empty-desc">Documentation will be generated automatically after analysis.</div>
+        </div>
+        <div id="docs-result"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ANNOTATED -->
+    <div class="tab-content" id="content-annotated">
+      <div class="code-wrap">
+        <div class="code-topbar">
+          <div class="code-lang" id="annotated-lang">—</div>
+          <button class="btn-copy" onclick="copyCode('annotated-code')">Copy</button>
+        </div>
+        <div class="code-scroll">
+          <div class="empty-state" id="annotated-empty">
+            <div class="empty-glyph">💬</div>
+            <div class="empty-title">No Annotated Code</div>
+            <div class="empty-desc">Your original code with inline comments and explanations will appear here.</div>
+          </div>
+          <div class="code-block" id="annotated-code" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: MODERN -->
+    <div class="tab-content" id="content-modern">
+      <div class="code-wrap">
+        <div class="code-topbar">
+          <div class="code-lang" id="modern-lang">—</div>
+          <button class="btn-copy" onclick="copyCode('modern-code')">Copy</button>
+        </div>
+        <div class="code-scroll">
+          <div class="empty-state" id="modern-empty">
+            <div class="empty-glyph">🚀</div>
+            <div class="empty-title">No Modernized Code</div>
+            <div class="empty-desc">The transformed, modern version of your code will appear here.</div>
+          </div>
+          <div class="code-block" id="modern-code" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: DIFF -->
+    <div class="tab-content" id="content-diff">
+      <div class="code-wrap">
+        <div class="code-topbar">
+          <div class="code-lang" id="diff-lang">Legacy ↔ Modern Diff</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent3)">+ Added</span>
+            <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--danger)">- Removed</span>
+          </div>
+        </div>
+        <div class="diff-wrap code-scroll" id="diff-view">
+          <div class="empty-state" id="diff-empty">
+            <div class="empty-glyph">🔀</div>
+            <div class="empty-title">No Diff Available</div>
+            <div class="empty-desc">The side-by-side diff between legacy and modern code appears here after transformation.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+const DEEPSEEK_BASE_URL = "https://genailab.tcs.in";
+const DEEPSEEK_MODEL = "azure_ai/genailab-maas-DeepSeek-V3-0324";
+
+// ── SAMPLES ──
+const SAMPLES = {
+  py2: `#!/usr/bin/env python
+# Legacy Python 2.7 user management script
+import MySQLdb
+import md5
+import urllib2
+import simplejson as json
+
+db = MySQLdb.connect("localhost","root","password","users")
+cursor = db.cursor()
+
+def get_user(user_id):
+    cursor.execute("SELECT * FROM users WHERE id=%s" % user_id)
+    row = cursor.fetchone()
+    return row
+
+def create_user(username, password, email):
+    hashed = md5.new(password).hexdigest()
+    sql = "INSERT INTO users (username, password, email) VALUES ('%s','%s','%s')" % (username, hashed, email)
+    cursor.execute(sql)
+    db.commit()
+    print "User created:", username
+
+def fetch_remote_data(url):
+    try:
+        response = urllib2.urlopen(url)
+        data = json.loads(response.read())
+        return data
+    except urllib2.URLError, e:
+        print "Error fetching URL:", e
+        return None
+
+def process_users():
+    cursor.execute("SELECT * FROM users")
+    rows = cursor.fetchall()
+    for row in rows:
+        print "Processing:", row[1]
+        data = fetch_remote_data("http://api.example.com/user/" + str(row[0]))
+        if data != None:
+            print "Got data for", row[1]
+
+if __name__ == "__main__":
+    create_user("admin", "password123", "admin@example.com")
+    process_users()`,
+
+  php5: `<?php
+// Legacy PHP 5 product catalog
+mysql_connect("localhost", "root", "password");
+mysql_select_db("shop");
+
+function getProducts($category) {
+    $cat = mysql_real_escape_string($category);
+    $result = mysql_query("SELECT * FROM products WHERE category='$cat'");
+    $products = array();
+    while($row = mysql_fetch_array($result)) {
+        $products[] = $row;
+    }
+    return $products;
+}
+
+function addProduct($name, $price, $category) {
+    $name = mysql_real_escape_string($name);
+    $category = mysql_real_escape_string($category);
+    $sql = "INSERT INTO products (name, price, category) VALUES ('$name', $price, '$category')";
+    mysql_query($sql);
+    return mysql_insert_id();
+}
+
+function getUserFromSession() {
+    session_start();
+    if(isset($_SESSION['user_id'])) {
+        $id = $_SESSION['user_id'];
+        $result = mysql_query("SELECT * FROM users WHERE id=$id");
+        return mysql_fetch_object($result);
+    }
+    return null;
+}
+
+$user = getUserFromSession();
+if($user != null) {
+    $products = getProducts($_GET['cat']);
+    foreach($products as $p) {
+        echo "<div>" . $p['name'] . " - $" . $p['price'] . "</div>";
+    }
+} else {
+    header("Location: login.php");
+}
+?>`,
+
+  es5: `// Legacy ES5 JavaScript - Data fetcher with callbacks
+var API_BASE = 'http://api.example.com';
+
+function fetchUser(userId, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', API_BASE + '/users/' + userId, true);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                callback(null, JSON.parse(xhr.responseText));
+            } else {
+                callback(new Error('Failed: ' + xhr.status), null);
+            }
+        }
+    };
+    xhr.send();
+}
+
+function fetchUserPosts(userId, callback) {
+    fetchUser(userId, function(err, user) {
+        if (err) { callback(err, null); return; }
+        var xhr2 = new XMLHttpRequest();
+        xhr2.open('GET', API_BASE + '/posts?user=' + userId, true);
+        xhr2.onreadystatechange = function() {
+            if (xhr2.readyState === 4) {
+                if (xhr2.status === 200) {
+                    callback(null, { user: user, posts: JSON.parse(xhr2.responseText) });
+                } else {
+                    callback(new Error('Posts failed'), null);
+                }
+            }
+        };
+        xhr2.send();
+    });
+}
+
+function renderDashboard(userId) {
+    fetchUserPosts(userId, function(err, data) {
+        if (err) {
+            document.getElementById('error').innerHTML = err.message;
+            return;
+        }
+        var html = '<h1>' + data.user.name + '</h1><ul>';
+        for (var i = 0; i < data.posts.length; i++) {
+            html += '<li>' + data.posts[i].title + '</li>';
+        }
+        html += '</ul>';
+        document.getElementById('app').innerHTML = html;
+    });
+}`,
+
+  java7: `// Legacy Java 7 file processor
+import java.io.*;
+import java.util.*;
+import java.sql.*;
+
+public class ReportGenerator {
+    private static Connection conn;
+    
+    public static void initDB() throws Exception {
+        Class.forName("com.mysql.jdbc.Driver");
+        conn = DriverManager.getConnection(
+            "jdbc:mysql://localhost/reports", "root", "password");
+    }
+    
+    public static List<Map<String, String>> getReports(String department) throws Exception {
+        List<Map<String, String>> results = new ArrayList<Map<String, String>>();
+        PreparedStatement ps = conn.prepareStatement(
+            "SELECT * FROM reports WHERE dept=?");
+        ps.setString(1, department);
+        ResultSet rs = ps.executeQuery();
+        while(rs.next()) {
+            Map<String, String> row = new HashMap<String, String>();
+            row.put("id", rs.getString("id"));
+            row.put("title", rs.getString("title"));
+            row.put("data", rs.getString("data"));
+            results.add(row);
+        }
+        return results;
+    }
+    
+    public static void writeCSV(List<Map<String, String>> data, String path) throws Exception {
+        FileWriter fw = new FileWriter(path);
+        fw.write("id,title,data\\n");
+        for(Map<String, String> row : data) {
+            fw.write(row.get("id") + "," + row.get("title") + "," + row.get("data") + "\\n");
+        }
+        fw.close();
+    }
+    
+    public static void main(String[] args) {
+        try {
+            initDB();
+            List<Map<String, String>> reports = getReports("engineering");
+            writeCSV(reports, "output.csv");
+            System.out.println("Done. " + reports.size() + " reports written.");
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+}`
+};
+
+function loadSample(key) {
+  document.getElementById('code-input').value = SAMPLES[key];
+}
+
+// ── FILE HANDLING ──
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+}
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (file) readFile(file);
+}
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('code-input').value = ev.target.result.slice(0, 8000);
+    document.getElementById('file-badge-wrap').innerHTML =
+      `<div class="file-badge" style="margin-top:8px">📎 <span style="flex:1">${file.name}</span>
+       <span class="rm" onclick="clearFile()">✕</span></div>`;
+  };
+  reader.readAsText(file);
+}
+function clearFile() {
+  document.getElementById('file-badge-wrap').innerHTML = '';
+  document.getElementById('file-input').value = '';
+}
+
+// ── TAB SWITCHING ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('content-' + name).classList.add('active');
+}
+
+// ── AGENT LOG ──
+function agentLog(step, msg, done = false) {
+  document.getElementById('agent-step').textContent = step;
+  document.getElementById('agent-msg').textContent = msg;
+  const ind = document.getElementById('agent-indicator');
+  if (done) {
+    ind.innerHTML = `<div class="agent-check">✓</div>`;
+  } else {
+    ind.innerHTML = `<div class="agent-spinner"></div>`;
+  }
+}
+
+function setProgress(running) {
+  const bar = document.getElementById('prog-bar');
+  bar.className = 'prog-bar' + (running ? ' run' : '');
+  if (!running) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; bar.style.transition = 'none'; }, 800); }
+}
+
+// ── DEEPSEEK / TCS GENAILAB CALL (OpenAI-compatible) ──
+async function callDeepSeek(apiKey, systemPrompt, userPrompt) {
+  const resp = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 4096,
+      temperature: 0.2
+    })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  return data.choices?.[0]?.message?.content || '';
+}
+
+function parseJSON(raw) {
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+// ── MAIN FLOW ──
+async function runModernizer() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  const code = document.getElementById('code-input').value.trim();
+
+  if (!apiKey) { alert('Please enter your TCS GenAI Lab API key.'); return; }
+  if (!code) { alert('Please paste or upload legacy code first.'); return; }
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Agent Running…';
+  setProgress(true);
+
+  // Reset outputs
+  document.getElementById('compat-empty').style.display = '';
+  document.getElementById('compat-result').style.display = 'none';
+  document.getElementById('compat-result').innerHTML = '';
+  document.getElementById('docs-result').innerHTML = '';
+  document.getElementById('docs-empty').style.display = '';
+  document.getElementById('annotated-code').style.display = 'none';
+  document.getElementById('annotated-empty').style.display = '';
+  document.getElementById('modern-code').style.display = 'none';
+  document.getElementById('modern-empty').style.display = '';
+  document.getElementById('diff-view').innerHTML = '<div class="empty-state" id="diff-empty"><div class="empty-glyph">🔀</div><div class="empty-title">Building diff…</div></div>';
+  ['badge-compat','badge-docs','badge-annotated','badge-modern','badge-diff'].forEach(id => {
+    document.getElementById(id).classList.remove('show');
+    document.getElementById(id).textContent = '';
+  });
+
+  try {
+
+    // ── STEP 1: Detect & Decide Platform ──
+    agentLog('[1/4]', 'Detecting language, version, and deciding modern target…');
+
+    const compatRaw = await callDeepSeek(apiKey,
+      `You are an expert software architect and code modernization agent. Analyze legacy code and make agentic decisions about the best modern platform/version to migrate to. Always respond with valid JSON only, no markdown.`,
+      `Analyze this legacy code and return ONLY valid JSON:
+
+CODE:
+${code}
+
+Return exactly:
+{
+  "detected_lang": "<language name>",
+  "detected_version": "<version e.g. Python 2.7>",
+  "detected_platform": "<platform/runtime>",
+  "target_lang": "<modern language name>",
+  "target_version": "<modern version e.g. Python 3.12>",
+  "target_platform": "<modern platform/runtime>",
+  "migration_effort": "<Low|Medium|High>",
+  "breaking_changes": <integer count>,
+  "compatibility_score": <integer 0-100>,
+  "decision_reasoning": "<3-4 sentences explaining WHY this target was chosen>",
+  "key_changes": ["<change 1>", "<change 2>", "<change 3>", "<change 4>", "<change 5>"],
+  "alternatives": [
+    {"name": "<alt platform/version>", "score": <int>, "reason": "<why not chosen>"},
+    {"name": "<alt platform/version>", "score": <int>, "reason": "<why not chosen>"}
+  ],
+  "security_issues": <integer count>,
+  "deprecated_apis": <integer count>
+}`
+    );
+
+    const compat = parseJSON(compatRaw);
+    renderCompat(compat);
+    agentLog('[1/4]', `Detected: ${compat.detected_version} → Target: ${compat.target_version}`, true);
+    showBadge('badge-compat', '✓');
+    switchTab('compat');
+
+    // ── STEP 2: Generate Documentation ──
+    agentLog('[2/4]', 'Generating technical documentation…');
+
+    const docsRaw = await callDeepSeek(apiKey,
+      `You are a senior technical writer and software architect. Generate thorough documentation for legacy code. Return ONLY valid JSON, no markdown.`,
+      `Generate documentation for this ${compat.detected_lang} ${compat.detected_version} code:
+
+CODE:
+${code}
+
+Return exactly:
+{
+  "overview": "<2-3 sentence overview of what this code does>",
+  "purpose": "<the business/technical purpose of this code>",
+  "architecture_notes": "<how the code is structured>",
+  "functions": [
+    {
+      "name": "<function/method/class name>",
+      "purpose": "<what it does>",
+      "params": "<parameters and types>",
+      "returns": "<return value>",
+      "notes": "<any important notes, side effects, or concerns>"
+    }
+  ],
+  "dependencies": ["<dep1>", "<dep2>"],
+  "known_issues": ["<issue1>", "<issue2>"],
+  "migration_notes": "<specific notes about migrating this to ${compat.target_version}>"
+}`
+    );
+
+    const docs = parseJSON(docsRaw);
+    renderDocs(docs, compat);
+    agentLog('[2/4]', `Documentation generated — ${docs.functions?.length || 0} functions documented`, true);
+    showBadge('badge-docs', '✓');
+
+    // ── STEP 3: Annotate Source Code ──
+    agentLog('[3/4]', 'Adding inline comments and annotations to source code…');
+
+    const annotatedRaw = await callDeepSeek(apiKey,
+      `You are an expert code reviewer. Add clear, helpful inline comments to legacy code. Explain what each section does, highlight issues, deprecated APIs, and security concerns. Return ONLY the commented source code as plain text — no JSON, no markdown fences.`,
+      `Add comprehensive inline comments to this ${compat.detected_lang} ${compat.detected_version} legacy code.
+
+For each function/block add:
+- A header comment explaining purpose
+- Inline comments on complex/problematic lines
+- Mark deprecated APIs with: # DEPRECATED: ...
+- Mark security issues with: # SECURITY ISSUE: ...
+- Mark migration hints with: # MIGRATION: ...
+
+Return ONLY the commented source code, no explanations outside the code:
+
+${code}`
+    );
+
+    renderAnnotated(annotatedRaw, compat);
+    agentLog('[3/4]', 'Source code annotated with inline comments', true);
+    showBadge('badge-annotated', '✓');
+
+    // ── STEP 4: Modernize Code ──
+    agentLog('[4/4]', `Transforming to ${compat.target_lang} ${compat.target_version}…`);
+
+    const modernRaw = await callDeepSeek(apiKey,
+      `You are an expert software engineer specializing in code modernization and migration. Transform legacy code to modern equivalents using best practices. Return ONLY the modernized source code as plain text — no JSON, no markdown fences, no explanations.`,
+      `Transform this ${compat.detected_lang} ${compat.detected_version} legacy code to ${compat.target_lang} ${compat.target_version}.
+
+Requirements:
+- Use modern idioms, syntax, and best practices for ${compat.target_version}
+- Replace all deprecated APIs with modern equivalents
+- Fix security vulnerabilities (SQL injection, MD5 hashing, etc.)
+- Add proper error handling and type hints where applicable
+- Add a file header comment documenting the transformation
+- Preserve all original functionality
+
+Legacy code:
+${code}`
+    );
+
+    renderModern(modernRaw, compat);
+    renderDiff(code, modernRaw, compat);
+    agentLog('[4/4]', `Transformation to ${compat.target_version} complete!`, true);
+    showBadge('badge-modern', '✓');
+    showBadge('badge-diff', '✓');
+
+    setProgress(false);
+    document.getElementById('pill-model').textContent = `DeepSeek-V3-0324 · ${compat.target_version}`;
+
+  } catch (err) {
+    agentLog('ERROR', err.message, true);
+    document.getElementById('agent-indicator').innerHTML = `<span style="color:var(--danger);font-size:16px">✗</span>`;
+    setProgress(false);
+    alert('Error: ' + err.message + '\n\nCheck your TCS GenAI Lab API key and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>⚡</span> Analyze & Modernize';
+  }
+}
+
+// ── RENDER COMPAT ──
+function renderCompat(c) {
+  const eff = c.migration_effort;
+  const effColor = eff === 'Low' ? 'var(--accent3)' : eff === 'Medium' ? 'var(--warn)' : 'var(--danger)';
+  const scoreColor = c.compatibility_score >= 70 ? 'var(--accent3)' : c.compatibility_score >= 40 ? 'var(--warn)' : 'var(--danger)';
+
+  const alts = (c.alternatives || []).map((a, i) =>
+    `<div class="alt-item" style="animation-delay:${i*0.1}s">
+      <div class="alt-rank">#${i+2}</div>
+      <div><div class="alt-name">${esc(a.name)}</div><div class="alt-why">${esc(a.reason)}</div></div>
+      <div class="alt-score ${a.score >= 70 ? 'score-high' : 'score-med'}">${a.score}%</div>
+    </div>`
+  ).join('');
+
+  const changes = (c.key_changes || []).map(ch =>
+    `<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--accent2);flex-shrink:0">→</span>${esc(ch)}
+    </div>`
+  ).join('');
+
+  document.getElementById('compat-empty').style.display = 'none';
+  const res = document.getElementById('compat-result');
+  res.style.display = '';
+  res.innerHTML = `
+    <div class="compat-hero">
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:0.15em;margin-bottom:10px">AGENTIC DECISION</div>
+      <div class="compat-decision">${esc(c.detected_lang)} ${esc(c.detected_version)} → ${esc(c.target_lang)} ${esc(c.target_version)}</div>
+      <div class="compat-version">⚙ ${esc(c.target_platform)}</div>
+      <div class="compat-reasoning">${esc(c.decision_reasoning)}</div>
+      <div class="compat-grid">
+        <div class="compat-stat"><div class="cs-val" style="color:${scoreColor}">${c.compatibility_score}%</div><div class="cs-lbl">Compat Score</div></div>
+        <div class="compat-stat"><div class="cs-val" style="color:${effColor}">${esc(c.migration_effort)}</div><div class="cs-lbl">Effort Level</div></div>
+        <div class="compat-stat"><div class="cs-val" style="color:var(--danger)">${c.security_issues}</div><div class="cs-lbl">Security Issues</div></div>
+        <div class="compat-stat"><div class="cs-val">${c.breaking_changes}</div><div class="cs-lbl">Breaking Changes</div></div>
+        <div class="compat-stat"><div class="cs-val" style="color:var(--warn)">${c.deprecated_apis}</div><div class="cs-lbl">Deprecated APIs</div></div>
+        <div class="compat-stat"><div class="cs-val" style="color:var(--accent3)">${(c.key_changes||[]).length}</div><div class="cs-lbl">Key Changes</div></div>
+      </div>
+    </div>
+    <div class="section-hd">Key Changes Required</div>
+    <div style="margin-bottom:18px">${changes}</div>
+    <div class="section-hd">Alternative Targets Considered</div>
+    <div class="alt-list">${alts}</div>
+  `;
+}
+
+// ── RENDER DOCS ──
+function renderDocs(docs, compat) {
+  document.getElementById('docs-empty').style.display = 'none';
+  const fns = (docs.functions || []).map((f, i) => `
+    <div class="doc-block" style="animation-delay:${i*0.08}s">
+      <div class="doc-type">Function / Method</div>
+      <div class="doc-title">${esc(f.name)}</div>
+      <div class="doc-body">
+        <strong style="color:var(--text)">Purpose:</strong> ${esc(f.purpose)}<br><br>
+        ${f.params ? `<strong style="color:var(--text)">Parameters:</strong> <code style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent2)">${esc(f.params)}</code><br>` : ''}
+        ${f.returns ? `<strong style="color:var(--text)">Returns:</strong> ${esc(f.returns)}<br>` : ''}
+        ${f.notes ? `<br><strong style="color:var(--warn)">⚠ Notes:</strong> ${esc(f.notes)}` : ''}
+      </div>
+    </div>`).join('');
+
+  const issues = (docs.known_issues || []).map(i =>
+    `<div style="padding:6px 10px;border-left:3px solid var(--danger);margin-bottom:6px;font-size:12px;color:var(--muted)">${esc(i)}</div>`
+  ).join('');
+
+  const deps = (docs.dependencies || []).map(d =>
+    `<span style="font-family:'Space Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--accent2)">${esc(d)}</span>`
+  ).join(' ');
+
+  document.getElementById('docs-result').innerHTML = `
+    <div class="doc-block" style="border-color:rgba(124,58,237,0.3);background:rgba(124,58,237,0.05)">
+      <div class="doc-type">Overview — ${esc(compat.detected_version)}</div>
+      <div class="doc-title">Code Documentation</div>
+      <div class="doc-body">
+        <strong style="color:var(--text)">Overview:</strong> ${esc(docs.overview)}<br><br>
+        <strong style="color:var(--text)">Purpose:</strong> ${esc(docs.purpose)}<br><br>
+        <strong style="color:var(--text)">Architecture:</strong> ${esc(docs.architecture_notes)}
+        ${deps ? `<br><br><strong style="color:var(--text)">Dependencies:</strong><br><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${deps}</div>` : ''}
+      </div>
+    </div>
+    <div class="section-hd">Functions & Methods</div>
+    ${fns}
+    ${issues ? `<div class="section-hd">Known Issues</div><div style="margin-bottom:14px">${issues}</div>` : ''}
+    <div class="doc-block" style="border-color:rgba(6,182,212,0.3)">
+      <div class="doc-type">Migration Guide → ${esc(compat.target_version)}</div>
+      <div class="doc-title">Migration Notes</div>
+      <div class="doc-body">${esc(docs.migration_notes)}</div>
+    </div>
+  `;
+}
+
+// ── RENDER ANNOTATED ──
+function renderAnnotated(code, compat) {
+  document.getElementById('annotated-empty').style.display = 'none';
+  document.getElementById('annotated-lang').textContent = `${compat.detected_lang} ${compat.detected_version} — Annotated`;
+  const el = document.getElementById('annotated-code');
+  el.style.display = '';
+  el.textContent = code;
+}
+
+// ── RENDER MODERN ──
+function renderModern(code, compat) {
+  document.getElementById('modern-empty').style.display = 'none';
+  document.getElementById('modern-lang').textContent = `${compat.target_lang} ${compat.target_version} — Modernized`;
+  const el = document.getElementById('modern-code');
+  el.style.display = '';
+  el.textContent = code;
+}
+
+// ── RENDER DIFF ──
+function renderDiff(original, modern, compat) {
+  const origLines = original.split('\n');
+  const modernLines = modern.split('\n');
+  const maxLen = Math.max(origLines.length, modernLines.length);
+
+  let html = '';
+  let lineNum = 1;
+
+  // Simple line-based diff: show removed from original, added in modern
+  const origSet = new Set(origLines.map(l => l.trim()));
+  const modernSet = new Set(modernLines.map(l => l.trim()));
+
+  // Show all lines, marking changed ones
+  modernLines.forEach((line, i) => {
+    const trimmed = line.trim();
+    const isNew = trimmed && !origSet.has(trimmed);
+    html += `<div class="diff-line${isNew ? ' add' : ''}">
+      <div class="diff-gutter">${lineNum++}</div>
+      <div class="diff-sign">${isNew ? '+' : ' '}</div>
+      <div class="diff-code">${esc(line)}</div>
+    </div>`;
+  });
+
+  // Show lines that were removed
+  const removedLines = origLines.filter(l => l.trim() && !modernSet.has(l.trim()));
+  if (removedLines.length) {
+    html += `<div class="diff-line" style="opacity:0.4;background:rgba(99,99,99,0.05)">
+      <div class="diff-gutter">—</div><div class="diff-sign"></div>
+      <div class="diff-code" style="color:var(--muted);font-size:9px;letter-spacing:0.1em">── ${removedLines.length} LEGACY LINES REMOVED ──</div>
+    </div>`;
+    removedLines.slice(0, 20).forEach(line => {
+      html += `<div class="diff-line rem">
+        <div class="diff-gutter">−</div>
+        <div class="diff-sign">-</div>
+        <div class="diff-code">${esc(line)}</div>
+      </div>`;
+    });
+  }
+
+  document.getElementById('diff-lang').textContent =
+    `${compat.detected_version} → ${compat.target_version} · ${modernLines.length} lines`;
+  document.getElementById('diff-view').innerHTML = html;
+}
+
+// ── UTILITIES ──
+function showBadge(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.classList.add('show');
+}
+
+function copyCode(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btns = document.querySelectorAll('.btn-copy');
+    btns.forEach(b => { if (b.getAttribute('onclick')?.includes(id)) b.textContent = 'Copied!'; });
+    setTimeout(() => btns.forEach(b => b.textContent = 'Copy'), 1500);
+  });
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// Init
+loadSample('py2');
+</script>
+</body>
+</html>
